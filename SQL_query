@@ -1,30 +1,54 @@
-Seller group = (SELECT s.name as "SellerGroupName", s.SELLERGROUPID, MAX(s.shopdate) AS "Age", COUNT(s.name) AS "GroupSize" FROM seller s
+
+SELECT * FROM Seller LEFT JOIN Seller_group ON Seller.SellerGroupName = Seller_group.SellerGroupName
+  INNER JOIN Platform ON Seller.SellerName = Platform.SellerName
+  INNER JOIN Alerts ON Seller.SellerName = Alerts.SellerName
+  INNER JOIN Infrigements ON Seller.SellerName = Infrigements.SellerName
+  INNER JOIN Stock ON Seller.SellerName = Stock.SellerName
+
+# With  
+
+Seller = (SELECT s.name as "SellerName", s.shopopendate AS "Age", s.sellergroupid  as "SellerGroupName" from seller s)
+
+Seller_group = (SELECT s.name as "SellerGroupName", s.SELLERGROUPID,  COUNT(s.name) AS "GroupSize" FROM seller s
                 GROUP BY s.sellergroupid
+                HAVING MAX(s.shopopendate)
                 )
 
-
-Platform = (SELECT s.name, dp.name FROM
+Platform = (SELECT s.name as "SellerName", dp.name FROM
             (seller s INNER JOIN domain d ON s.domainid = d.domainid)
             INNER JOIN domainconfiguration dc on dc.domainconfigurationid = d.domainconfigurationid
             INNER JOIN domainplatform dp on dc.domainplatform = dp.domainplatform
            )
 
-Alerts = (SELECT s.name as "SellerName",
-          CASE
-            WHEN i.contentLinkid IS NULL THEN
-              (SELECT COUNT(i.incidentstatusid) FROM seller s INNER JOIN incident i on s.linkid = i.contentLinkid WHERE i.incidentstatusid IN (5,6,7,8))
-            ELSE i.contentLinkid
-              (SELECT COUNT(i.incidentstatusid) FROM seller s INNER JOIN incident i on s.linkid = i.detectionLinkid WHERE i.incidentstatusid IN (5,6,7,8))
-            END AS "Alert"
-          CASE
-            WHEN i.contentLinkid IS NULL THEN
-              (SELECT COUNT(i.incidentstatusid) as "Infrigements" FROM seller s INNER JOIN incident i on s.linkid = i.contentLinkid WHERE i.incidentstatusid IN (15,19))
-            ELSE i.contentLinkid
-              (SELECT COUNT(i.incidentstatusid) as "Infrigements" FROM seller s INNER JOIN incident i on s.linkid = i.detectionLinkid WHERE i.incidentstatusid IN (15,19))
-            END AS "Infrigements"
-          FROM seller s, incident i
-          GROUP BY s.name)
+Alerts = (SELECT s.name as "SellerName", COUNT(i.incidentstatus) AS "SellerAlerts", SUM(SellerAlerts)) AS "GroupAlerts" FROM
+			seller s INNER JOIN
+			    ((SELECT COUNT(i.incidentid) AS "SellerAlerts",
+			    	(CASE WHEN i.contentLinkid IS NULL THEN i.detectionLinkid
+			    	ELSE i.contentLinkid
+			    	END) AS "linkid"
+			    FROM incidents i
+			    WHERE i.incidentstatusid IN (5,6,7,8)) a
+			    GROUP BY linkid
+			    )
+	  		ON s.linkid = a.linkid
+	  )
 
-Seller = (SELECT s.name as "SellerName",
-          CASE
-            WHEN dp.name as "Platforms", s.shopdate as 'Age' FROM seller s, domainplatform dp)
+Infrigements = (SELECT s.name as "SellerName", COUNT(i.incidentstatus) AS "Infrigements", SUM(Infrigements)) AS "GroupInfrigements"
+			seller s INNER JOIN
+			    ((SELECT COUNT(i.incidentid) AS "SellerAlerts",
+			    	(CASE WHEN i.contentLinkid IS NULL THEN i.detectionLinkid
+			    	ELSE i.contentLinkid
+			    	END) AS "linkid"
+			    FROM incidents i
+			    WHERE i.incidentstatusid IN (15,19)) a
+			    GROUP BY linkid
+			    )
+	  		ON s.linkid = a.linkid
+	  )
+
+
+Stock = (SELECT s.name as "SellerName", Sum(e.floatvalue) AS "SellerStock" FROM seller s, extrainfo e
+		 where (e.TypeId = 2 AND s.linkid = e.linkid)
+
+
+	)
