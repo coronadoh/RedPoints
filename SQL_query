@@ -1,0 +1,30 @@
+Seller group = (SELECT s.name as "SellerGroupName", s.SELLERGROUPID, MAX(s.shopdate) AS "Age", COUNT(s.name) AS "GroupSize" FROM seller s
+                GROUP BY s.sellergroupid
+                )
+
+
+Platform = (SELECT s.name, dp.name FROM
+            (seller s INNER JOIN domain d ON s.domainid = d.domainid)
+            INNER JOIN domainconfiguration dc on dc.domainconfigurationid = d.domainconfigurationid
+            INNER JOIN domainplatform dp on dc.domainplatform = dp.domainplatform
+           )
+
+Alerts = (SELECT s.name as "SellerName",
+          CASE
+            WHEN i.contentLinkid IS NULL THEN
+              (SELECT COUNT(i.incidentstatusid) FROM seller s INNER JOIN incident i on s.linkid = i.contentLinkid WHERE i.incidentstatusid IN (5,6,7,8))
+            ELSE i.contentLinkid
+              (SELECT COUNT(i.incidentstatusid) FROM seller s INNER JOIN incident i on s.linkid = i.detectionLinkid WHERE i.incidentstatusid IN (5,6,7,8))
+            END AS "Alert"
+          CASE
+            WHEN i.contentLinkid IS NULL THEN
+              (SELECT COUNT(i.incidentstatusid) as "Infrigements" FROM seller s INNER JOIN incident i on s.linkid = i.contentLinkid WHERE i.incidentstatusid IN (15,19))
+            ELSE i.contentLinkid
+              (SELECT COUNT(i.incidentstatusid) as "Infrigements" FROM seller s INNER JOIN incident i on s.linkid = i.detectionLinkid WHERE i.incidentstatusid IN (15,19))
+            END AS "Infrigements"
+          FROM seller s, incident i
+          GROUP BY s.name)
+
+Seller = (SELECT s.name as "SellerName",
+          CASE
+            WHEN dp.name as "Platforms", s.shopdate as 'Age' FROM seller s, domainplatform dp)
